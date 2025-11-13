@@ -1,16 +1,5 @@
-#!/bin/bash
 
-#-------------------------------------------------------------
-# concat_samples_v2.sh
-# ------------------------------------------------------------
-# Crea un entorno de trabajo para concatenar archivos FASTQ.gz
-# provenientes de múltiples lanes o flowcells, unificando por muestra biológica.
-# ------------------------------------------------------------
-# Uso:
-#   bash concat_samples_v2.sh <directorio_raw_data> <cores>
-# Ejemplo:
-#   bash concat_samples_v2.sh /home/meg/gabi/raw_data 8
-# -------------------------------------------------------------
+#!/bin/bash
 
 #-------------------------------------------------------------
 # Control de argumentos
@@ -18,7 +7,7 @@
 if [[ $# -ne 2 ]]; then
     echo '--------------------------------------------------------------------------------------------------------------'
     echo 'usage: concat_samples_v2.sh <directorio_raw_data> <cores>'
-    echo 'Ejemplo: bash concat_samples_v2.sh /home/meg/gabi/raw_data 8'
+    echo 'Ejemplo: bash concat_samples_v2.sh /home/meg/gabi/il_fag/raw_data 12'
     echo '--------------------------------------------------------------------------------------------------------------'
     exit 1
 fi
@@ -28,7 +17,7 @@ fi
 #-------------------------------------------------------------
 raw_dir=$1
 cores=$2
-workspace_dir="${raw_dir}/../concat_workspace_v2"
+workspace_dir="${raw_dir}/../concat_workspace"
 
 echo "🖥️  Iniciando proceso en $(hostname)"
 echo "📁 Directorio original: $raw_dir"
@@ -49,7 +38,7 @@ echo "-------------------------------------------------------------"
 # Activar entorno Conda
 #-------------------------------------------------------------
 eval "$(conda shell.bash hook)"
-conda activate base   # Cambiar si se usa otro entorno
+conda activate base   # Cambia esto si usas otro entorno
 
 startTime=$(date +%s)
 
@@ -57,11 +46,12 @@ startTime=$(date +%s)
 # Verificación de integridad (MD5)
 #-------------------------------------------------------------
 echo "🔍 Verificando integridad de los archivos .fastq.gz..."
-if [[ -f "$raw_dir/md5s.txt" ]]; then
-    md5sum -c "$raw_dir/md5s.txt" > "$workspace_dir/md5_check.log" 2>&1
+md5_file=$(ls "$raw_dir"/*md5s.txt 2>/dev/null | head -n1)
+if [[ -f "$md5_file" ]]; then
+    md5sum -c "$md5_file" > "$workspace_dir/md5_check.log" 2>&1
     echo "✅ Revisión de MD5 completada. Ver '$workspace_dir/md5_check.log'"
 else
-    echo "⚠️  No se encontró archivo de checksums, se omite la verificación."
+    echo "⚠️  No se encontró archivo MD5, se omite la verificación."
 fi
 echo "-------------------------------------------------------------"
 
@@ -69,6 +59,7 @@ echo "-------------------------------------------------------------"
 # Mapeo entre identificadores Illumina y nombres de muestra
 #-------------------------------------------------------------
 declare -A sample_map
+
 sample_map["UDP0022"]="MCHA-MB-1-VIRFC"
 sample_map["UDP0023"]="MCHA-DE-14-VIRFC"
 sample_map["UDP0024"]="MCHA-OR-22-VIRFC"
@@ -92,12 +83,12 @@ for id in "${!sample_map[@]}"; do
     sample="${sample_map[$id]}"
     echo "🧬 Procesando muestra: $sample (ID Illumina: $id)"
 
-    files_R1=$(ls "$workspace_dir"/*${id}_1.fastq.gz 2>/dev/null)
-    files_R2=$(ls "$workspace_dir"/*${id}_2.fastq.gz 2>/dev/null)
+    # Buscar todos los fastq R1 y R2 que contengan el ID
+    files_R1=$(ls "$workspace_dir"/*${id}*_1.fastq.gz 2>/dev/null)
+    files_R2=$(ls "$workspace_dir"/*${id}*_2.fastq.gz 2>/dev/null)
 
     if [[ -z "$files_R1" || -z "$files_R2" ]]; then
         echo "⚠️  No se encontraron archivos para $sample ($id)"
-        echo "-------------------------------------------------------------"
         continue
     fi
 
@@ -134,4 +125,3 @@ done
 endTime=$(date +%s)
 echo "🏁 Proceso finalizado en $(( (endTime - startTime)/60 )) minutos."
 echo "📅 Fecha de finalización: $(date)"
-echo "-------------------------------------------------------------"
